@@ -1,0 +1,179 @@
+﻿installer le nuget Microsoft.AspNet.Identity.EntityFramework
+créer la classe IdentityModels.cs dans le repertoire Models
+
+namespace WebApi_AspNetIdentity.Models
+{
+	public class ApplicationUser : IdentityUser
+	{
+
+	}
+	public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+	{
+		public ApplicationDbContext()
+			: base("DefaultConnection", throwIfV1Schema: false)
+		{
+
+		}
+	}
+}
+
+Placer la chaine de connexion dans le fichier de configuration
+
+<connectionStrings>
+		<add name="DefaultConnection" connectionString="Data Source=.; Initial Catalog=AngWebApiDb;Integrated Security=True" providerName="System.Data.SqlClient"/>  		
+</connectionStrings>
+
+Saisir les commandes suivantes
+enable-migrations
+add-migration InitialDB
+update-database
+
+NB: Ce dernier script crée la base de données avec des tables ayant pour prefixe ASPNet.
+Comment supprimer les prefixes AspNet devant chaque nom de table? il faut modifier la classe IdentityModels.cs
+
+------------------------------------------------
+
+namespace WebApi_AspNetIdentity.Models
+{
+	public class ApplicationUser : IdentityUser
+	{
+
+	}
+	public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+	{
+		public ApplicationDbContext()
+			: base("DefaultConnection", throwIfV1Schema: false)
+		{
+		}
+
+		protected override void OnModelCreating(DbModelBuilder modelBuilder)
+		{
+			base.OnModelCreating(modelBuilder);
+			//AspNetUsers ---> User
+			modelBuilder.Entity<ApplicationUser>()
+				.ToTable("User");
+			//AspNetRoles ---> Roles
+			modelBuilder.Entity<IdentityRole>()
+			.ToTable("Role");
+			//AspNetUserRoles  ---> UserRole
+			modelBuilder.Entity<IdentityUserRole>()
+			.ToTable("UserRole");
+			//AspNetUserClaims ----> UserClaim
+			modelBuilder.Entity<IdentityUserClaim>()
+			.ToTable("UserClaim");
+			//AspNetUserLogins   ---> UserLogin
+			modelBuilder.Entity<IdentityUserLogin>()
+			.ToTable("UserLogin");
+
+		}
+	}
+}
+
+------------------------------------------------
+
+Saisir les commandes suivantes:
+add-migration ChangeDefaultTabmesNames
+update-database
+
+NB: Dans la table User, il manque des information comme FistName, LastName etc
+Si nous voulons completer la table avec ses informations.
+
+Il faut modifier la classe ApplicationUser en y ajoutant les champs à ajouter
+
+***********************************************
+namespace WebApi_AspNetIdentity.Models
+{
+	public class ApplicationUser : IdentityUser
+	{
+		public string FirstName { get; set; }
+		public string LastName { get; set; }
+	}
+	public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+	{
+		public ApplicationDbContext()
+			: base("DefaultConnection", throwIfV1Schema: false)
+		{
+		}
+
+		protected override void OnModelCreating(DbModelBuilder modelBuilder)
+		{
+			base.OnModelCreating(modelBuilder);
+			//AspNetUsers ---> User
+			modelBuilder.Entity<ApplicationUser>()
+				.ToTable("User");
+			//AspNetRoles ---> Roles
+			modelBuilder.Entity<IdentityRole>()
+			.ToTable("Role");
+			//AspNetUserRoles  ---> UserRole
+			modelBuilder.Entity<IdentityUserRole>()
+			.ToTable("UserRole");
+			//AspNetUserClaims ----> UserClaim
+			modelBuilder.Entity<IdentityUserClaim>()
+			.ToTable("UserClaim");
+			//AspNetUserLogins   ---> UserLogin
+			modelBuilder.Entity<IdentityUserLogin>()
+			.ToTable("UserLogin");
+
+		}
+	}
+}
+
+************************************************
+add-migration ChangeDefaultColumnNames
+update-database
+
+NB: Rafraichir la table et constater
+
+COMMENT AJOUTER UN NOUVEL USER DANS LA TABLE USER
+
+Dans le repertoire Controllers, ajouter le controller Account
+
+  public class AccountController : ApiController
+    {
+        [Route("api/User/Register")]
+        [HttpPost]
+        public IdentityResult Register(AccountModel model)
+        {
+            var userStore = new UserStore<ApplicationUser>(new ApplicationDbContext());
+            var manager = new UserManager<ApplicationUser>(userStore);
+            var user = new ApplicationUser() { UserName = model.UserName, Email = model.Email };
+            user.FirstName = model.FirstName;
+            user.LastName = model.LastName;
+
+            // Par defaut le minimum pour le mot de passe est de 6 caracteres donc pour changer ce caractere par defaut.
+
+            manager.PasswordValidator = new PasswordValidator
+            {
+                RequiredLength = 3
+            };
+
+            IdentityResult result = manager.Create(user, model.Password);
+            return result;
+        }
+    }
+
+
+Dans le repertoire Models, ajouter une classe AccountModel devant correspondre aux 
+champs envoyés par le formulaire angular
+
+namespace WebApi_AspNetIdentity.Models
+{
+	public class AccountModel
+	{
+		public string UserName { get; set; }
+		public string Email { get; set; }
+		public string Password { get; set; }
+		public string FirstName { get; set; }
+		public string LastName { get; set; }
+	}
+}
+
+
+
+APPELER Account DEPUIS LE PROJET ANGULAR
+****************************************
+1- Il faut activer CORS pour que angular puisse appeler le WebAPI
+
+Exécuter le script suivant:
+Install-package Microsoft.Aspnet.webapi.cors
+
